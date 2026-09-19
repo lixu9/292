@@ -113,6 +113,7 @@ export interface CodexLocalAccessTimeoutPreset {
 }
 
 export interface CodexLocalAccessCollection {
+  codexTicket?: CodexTicketConfig;
   enabled: boolean;
   port: number;
   apiKey: string;
@@ -524,4 +525,34 @@ export interface CodexInstanceGatewayView {
   managed: boolean;
   logApiKeyId: string;
   lastError: string | null;
+}
+
+export interface CodexTicketConfig {
+  enabled: boolean;
+  proxyUrl: string;
+  models: string[];
+  ttlSeconds: number;
+  refreshBeforeSeconds: number;
+  failClosed: boolean;
+}
+
+export interface CodexTicketStatus {
+  accountId: string;
+  model: string;
+  ready: boolean;
+  refreshing: boolean;
+  capturedAt: number;
+  expiresAt: number;
+  lastAttemptAt: number;
+  lastHttpStatus: number;
+  lastLength: number;
+  lastError: string;
+  attempts: number;
+}
+
+export interface CodexTicketSnapshot {
+  enabled: boolean;
+  running: boolean;
+  tickets: CodexTicketStatus[];
+  warning?: string;
 }

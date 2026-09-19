@@ -1,3 +1,4 @@
+import { CodexTicketPanel } from "../components/codex/CodexTicketPanel";
 import { Activity, BadgeDollarSign, ChevronDown, Check, CircleAlert, Copy, Eye, EyeOff, FolderPlus, Gauge, Image, Pin, PinOff, Play, Plus, Power, RefreshCw, Route, Send, ShieldCheck, SlidersHorizontal, Trash2, Undo2, Wrench, X } from "lucide-react";
 import { CodexIcon } from "../components/icons/CodexIcon";
 import { ManualHelpIconButton } from "../components/ManualHelpIconButton";
@@ -559,6 +560,8 @@ export function CodexApiServiceView(props: CodexApiServiceViewProps) {
             <CodexUsageTrend statsWindow={selectedStatsWindow} />
           </>
         )}
+
+        {(activeTab === "overview" || activeTab === "accounts") && <CodexTicketPanel collection={collection} />}
 
         {activeTab === "overview" && (
           <div className="codex-api-service-grid two">

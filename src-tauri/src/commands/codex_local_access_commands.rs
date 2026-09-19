@@ -885,3 +885,15 @@ mod tests {
         assert_eq!(summary.model_stats_count, 1);
     }
 }
+
+#[tauri::command]
+pub async fn codex_local_access_update_tickets(
+    config: crate::models::codex_local_access::CodexTicketConfig,
+) -> Result<CodexLocalAccessState, String> {
+    codex_local_access::update_local_access_tickets(config).await
+}
+
+#[tauri::command]
+pub async fn codex_local_access_ticket_status(refresh: Option<bool>) -> Result<serde_json::Value, String> {
+    codex_local_access::local_access_ticket_status(refresh.unwrap_or(false)).await
+}

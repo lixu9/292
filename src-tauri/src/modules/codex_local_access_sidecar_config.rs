@@ -2368,6 +2368,7 @@ fn prepare_sidecar_launch_config_in_dir_sync(
         "maxConcurrentImageRequests": collection.max_concurrent_image_requests,
         "maxAccountConcurrency": collection.max_account_concurrency,
         "accountConcurrencyWaitMs": collection.account_concurrency_wait_ms,
+        "codexTicket": collection.codex_ticket,
     });
 
     let mut config = Map::new();

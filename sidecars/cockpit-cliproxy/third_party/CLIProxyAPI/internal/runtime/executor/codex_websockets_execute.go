@@ -91,6 +91,9 @@ func (e *CodexWebsocketsExecutor) Execute(ctx context.Context, auth *cliproxyaut
 	reporter.SetTranslatedReasoningEffort(clientBody, to.String())
 	wsHeaders = applyCodexWebsocketHeaders(ctx, wsHeaders, auth, apiKey, e.cfg, opts.Headers)
 	applyModelHeaderOverrides(wsHeaders, baseModel)
+	if errTicket := applyHostCodexTicketForBody(auth, baseModel, upstreamBody, wsHeaders); errTicket != nil {
+		return resp, errTicket
+	}
 	removeCodexResponsesLiteHeaderForFullResponse(wsHeaders, useFullResponses)
 	removeCodexResponsesLiteHeaderForAPIKey(wsHeaders, auth)
 	applyCodexIdentityConfuseHeaders(wsHeaders, &identityState)
@@ -117,6 +120,8 @@ func (e *CodexWebsocketsExecutor) Execute(ctx context.Context, auth *cliproxyaut
 		sessionLocked = true
 		defer unlockSession()
 	}
+
+	e.refreshTicketSession(sess, baseModel, wsHeaders)
 
 	wsReqBody := buildCodexWebsocketRequestBody(upstreamBody)
 	wsReqLog := helps.UpstreamRequestLog{

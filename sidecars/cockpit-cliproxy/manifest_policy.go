@@ -91,6 +91,8 @@ type accountModelRule struct {
 }
 
 type manifest struct {
+	CodexTicket                codexTicketConfig `json:"codexTicket"`
+	tickets                    *codexTicketManager
 	Locale                     string              `json:"locale"`
 	APIKeys                    []apiKeySpec        `json:"apiKeys"`
 	Accounts                   []accountSpec       `json:"accounts"`

@@ -1299,6 +1299,7 @@ fn new_empty_local_access_collection() -> Result<CodexLocalAccessCollection, Str
         session_affinity_ttl_ms: DEFAULT_SESSION_AFFINITY_TTL_MS,
         session_affinity_default_enabled_migrated: true,
         responses_websockets_enabled: false,
+        codex_ticket: Default::default(),
         max_retry_credentials: 0,
         max_retry_interval_ms: DEFAULT_MAX_RETRY_INTERVAL_MS,
         timeouts: CodexLocalAccessTimeouts::default(),

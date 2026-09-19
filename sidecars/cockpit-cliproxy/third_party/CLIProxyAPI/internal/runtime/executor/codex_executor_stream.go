@@ -100,6 +100,9 @@ func (e *CodexExecutor) ExecuteStream(ctx context.Context, auth *cliproxyauth.Au
 		httpReq.Header.Set(codexResponsesLiteHeaderName, liteHeaderValue)
 	}
 	applyModelHeaderOverrides(httpReq.Header, baseModel)
+	if errTicket := applyHostCodexTicket(auth, baseModel, httpReq.Header); errTicket != nil {
+		return nil, errTicket
+	}
 	applyCodexIdentityConfuseHeaders(httpReq.Header, &identityState)
 	if useFullResponses {
 		removeCodexResponsesLiteHeaderForFullResponse(httpReq.Header, true)

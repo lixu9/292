@@ -505,6 +505,8 @@ pub struct CodexLocalAccessQuotaReserve {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CodexLocalAccessCollection {
+    #[serde(default)]
+    pub codex_ticket: CodexTicketConfig,
     pub enabled: bool,
     pub port: u16,
     pub api_key: String,
@@ -1053,4 +1055,23 @@ pub struct CodexInstanceGatewayView {
     pub log_api_key_id: String,
     /// 最近一次启动自愈失败原因；成功恢复或探测到运行中时为空。
     pub last_error: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct CodexTicketConfig {
+    pub enabled: bool,
+    pub proxy_url: String,
+    pub models: Vec<String>,
+    pub ttl_seconds: u32,
+    pub refresh_before_seconds: u32,
+    pub fail_closed: bool,
+}
+
+impl Default for CodexTicketConfig {
+    fn default() -> Self {
+        Self { enabled: false, proxy_url: String::new(),
+            models: vec!["gpt-6-astra".into(), "gpt-5.6-sol".into()],
+            ttl_seconds: 14400, refresh_before_seconds: 600, fail_closed: true }
+    }
 }

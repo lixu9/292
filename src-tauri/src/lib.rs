@@ -1084,6 +1084,8 @@ pub fn run() {
             commands::codex::codex_list_model_provider_models,
             commands::codex::codex_query_model_provider_usage,
             commands::codex::codex_local_access_get_state,
+            commands::codex::codex_local_access_update_tickets,
+            commands::codex::codex_local_access_ticket_status,
             commands::codex::codex_list_instance_gateways,
             commands::codex::codex_stop_instance_gateway,
             commands::codex::codex_restart_instance_gateway,

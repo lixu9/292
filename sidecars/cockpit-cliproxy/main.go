@@ -24,6 +24,7 @@ import (
 	sdkhandlers "github.com/router-for-me/CLIProxyAPI/v7/sdk/api/handlers"
 	sdkopenai "github.com/router-for-me/CLIProxyAPI/v7/sdk/api/handlers/openai"
 
+	"github.com/router-for-me/CLIProxyAPI/v7/sdk/cliproxy/codexticket"
 	coreusage "github.com/router-for-me/CLIProxyAPI/v7/sdk/cliproxy/usage"
 	"github.com/router-for-me/CLIProxyAPI/v7/sdk/config"
 
@@ -140,6 +141,16 @@ func main() {
 		emitter.emit(map[string]any{"type": "error", "message": err.Error()})
 		os.Exit(2)
 	}
+
+	m.tickets, err = newCodexTicketManager(m.CodexTicket, m, filepath.Join(filepath.Dir(*manifestPath), "codex-292-tickets.json"))
+	if err != nil {
+		emitter.emit(map[string]any{"type": "error", "message": err.Error()})
+		os.Exit(2)
+	}
+	if m.CodexTicket.Enabled {
+		codexticket.SetProvider(m.tickets)
+	}
+	defer codexticket.SetProvider(nil)
 	emitter.emitStartupStage("init_runtime")
 	m.quotaCooldowns = newQuotaCooldownStateStore(*quotaPoolStatePath, m)
 	if err := m.quotaCooldowns.load(); err != nil {
@@ -194,6 +205,7 @@ func main() {
 		os.Exit(1)
 	}
 	defer runtime.Stop()
+	m.tickets.start(ctx)
 	emitter.emitStartupStage("start_http_server")
 
 	// Reuse the same coreManager so WS upgrades share OAuth pool, routing and

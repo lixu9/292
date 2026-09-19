@@ -392,3 +392,11 @@ export async function streamCodexLocalAccessChatTest(
     messages,
   });
 }
+
+export async function updateTickets(config: import('../types/codexLocalAccess').CodexTicketConfig): Promise<CodexLocalAccessState> {
+  return invoke('codex_local_access_update_tickets', { config });
+}
+
+export async function getTicketStatus(refresh = false): Promise<import('../types/codexLocalAccess').CodexTicketSnapshot> {
+  return invoke('codex_local_access_ticket_status', { refresh });
+}

@@ -1788,6 +1788,9 @@ func buildCoreAuthSelectorWithConcurrency(cfg *config.Config, selector coreauth.
 		selector = &quotaReserveSelector{manifest: m, fallback: selector, quota: quota}
 		selector = &modelExclusionSelector{manifest: m, fallback: selector}
 		selector = &quotaCooldownSelector{manifest: m, fallback: selector}
+		if m.tickets != nil && m.tickets.cfg.Enabled {
+			selector = &codexTicketSelector{tickets: m.tickets, fallback: selector}
+		}
 	}
 	if accountConcurrencyEnabled(m, tracker) {
 		selector = &accountConcurrencySelector{
