@@ -92,6 +92,7 @@ type accountModelRule struct {
 
 type manifest struct {
 	CodexTicket                codexTicketConfig `json:"codexTicket"`
+	TicketControlKey           string `json:"ticketControlKey,omitempty"`
 	tickets                    *codexTicketManager
 	Locale                     string              `json:"locale"`
 	APIKeys                    []apiKeySpec        `json:"apiKeys"`
@@ -2132,6 +2133,11 @@ func isHiddenCodexClientModel(model string) bool {
 
 func shouldInspectJSONBody(r *http.Request) bool {
 	if r == nil {
+		return false
+	}
+	// Ticket files are private control data, not inference requests. Let their
+	// handler authorize and bound the body before reading or decoding it.
+	if r.URL != nil && r.URL.Path == "/v1/cockpit/tickets/import" {
 		return false
 	}
 	if r.Method != http.MethodPost && r.Method != http.MethodPut && r.Method != http.MethodPatch {

@@ -897,3 +897,13 @@ pub async fn codex_local_access_update_tickets(
 pub async fn codex_local_access_ticket_status(refresh: Option<bool>) -> Result<serde_json::Value, String> {
     codex_local_access::local_access_ticket_status(refresh.unwrap_or(false)).await
 }
+
+#[tauri::command]
+pub async fn codex_local_access_import_tickets(import_path: String) -> Result<serde_json::Value, String> {
+    codex_local_access::import_local_access_tickets(import_path).await
+}
+
+#[tauri::command]
+pub async fn codex_local_access_export_tickets(export_path: String) -> Result<serde_json::Value, String> {
+    codex_local_access::export_local_access_tickets(export_path).await
+}

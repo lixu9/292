@@ -1061,6 +1061,7 @@ pub struct CodexInstanceGatewayView {
 #[serde(default, rename_all = "camelCase")]
 pub struct CodexTicketConfig {
     pub enabled: bool,
+    pub import_only: bool,
     pub proxy_url: String,
     pub models: Vec<String>,
     pub ttl_seconds: u32,
@@ -1070,8 +1071,8 @@ pub struct CodexTicketConfig {
 
 impl Default for CodexTicketConfig {
     fn default() -> Self {
-        Self { enabled: false, proxy_url: String::new(),
+        Self { enabled: false, import_only: false, proxy_url: String::new(),
             models: vec!["gpt-6-astra".into(), "gpt-5.6-sol".into()],
-            ttl_seconds: 14400, refresh_before_seconds: 600, fail_closed: true }
+            ttl_seconds: 3600, refresh_before_seconds: 600, fail_closed: true }
     }
 }

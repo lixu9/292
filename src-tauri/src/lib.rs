@@ -313,6 +313,15 @@ fn summarize_deep_link_args(args: &[String]) -> Vec<String> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let context = tauri::generate_context!();
+    // Finder launches do not inherit the environment from tauri-dev.cjs.
+    // Keep the Dev bundle on its own profile before any storage is opened.
+    if matches!(context.config().identifier.as_str(),
+        "com.jlcodes.cockpit-tools.dev" | "com.jlcodes.cockpit-tools.codex292")
+        && std::env::var_os("COCKPIT_TOOLS_PROFILE").is_none()
+    {
+        std::env::set_var("COCKPIT_TOOLS_PROFILE", "dev");
+    }
     logger::init_logger();
     modules::diagnostics::install_panic_hook();
     modules::diagnostics::start_frontend_ready_watchdog();
@@ -1086,6 +1095,8 @@ pub fn run() {
             commands::codex::codex_local_access_get_state,
             commands::codex::codex_local_access_update_tickets,
             commands::codex::codex_local_access_ticket_status,
+            commands::codex::codex_local_access_import_tickets,
+            commands::codex::codex_local_access_export_tickets,
             commands::codex::codex_list_instance_gateways,
             commands::codex::codex_stop_instance_gateway,
             commands::codex::codex_restart_instance_gateway,
@@ -1538,7 +1549,7 @@ pub fn run() {
             commands::antigravity_legacy_instance::antigravity_legacy_open_instance_window,
             commands::antigravity_legacy_instance::antigravity_legacy_close_all_instances,
         ])
-        .build(tauri::generate_context!())
+        .build(context)
         .expect("error while building tauri application");
 
     app.run(|app_handle, event| {

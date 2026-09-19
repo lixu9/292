@@ -3,9 +3,11 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -20,11 +22,14 @@ import (
 	coreauth "github.com/router-for-me/CLIProxyAPI/v7/sdk/cliproxy/auth"
 	"github.com/router-for-me/CLIProxyAPI/v7/sdk/cliproxy/codexticket"
 	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v7/sdk/cliproxy/executor"
-	"github.com/router-for-me/CLIProxyAPI/v7/sdk/proxyutil"
+	"golang.org/x/net/proxy"
 )
+
+const codexTicketClientVersion = "0.155.1"
 
 type codexTicketConfig struct {
 	Enabled              bool     `json:"enabled"`
+	ImportOnly           bool     `json:"importOnly"`
 	ProxyURL             string   `json:"proxyUrl"`
 	Models               []string `json:"models"`
 	TTLSeconds           int      `json:"ttlSeconds"`
@@ -34,12 +39,13 @@ type codexTicketConfig struct {
 
 type codexTicketRecord struct {
 	State      string `json:"state"`
+	Source     string `json:"source,omitempty"`
 	CapturedAt int64  `json:"capturedAt"`
 	ExpiresAt  int64  `json:"expiresAt"`
 }
 
 func (r codexTicketRecord) valid(now time.Time) bool {
-	return len(r.State) == 292 && strings.HasPrefix(r.State, "gAAAAA") && now.UnixMilli() < r.ExpiresAt
+	return validCodexTicketState(r.State) && r.CapturedAt > 0 && r.CapturedAt <= now.Add(30*time.Second).UnixMilli() && r.ExpiresAt > r.CapturedAt && now.UnixMilli() < r.ExpiresAt
 }
 
 // Status deliberately excludes the ticket and OAuth credentials.
@@ -47,6 +53,7 @@ type codexTicketStatus struct {
 	AccountID      string `json:"accountId"`
 	Model          string `json:"model"`
 	Ready          bool   `json:"ready"`
+	Source         string `json:"source"`
 	Refreshing     bool   `json:"refreshing"`
 	CapturedAt     int64  `json:"capturedAt"`
 	ExpiresAt      int64  `json:"expiresAt"`
@@ -77,27 +84,28 @@ func newCodexTicketManager(cfg codexTicketConfig, m *manifest, path string) (*co
 	if !cfg.Enabled {
 		return t, nil
 	}
-	u, err := url.Parse(strings.TrimSpace(cfg.ProxyURL))
-	if err != nil || u.Hostname() == "" || (u.Scheme != "http" && u.Scheme != "https" && u.Scheme != "socks5" && u.Scheme != "socks5h") || (u.Path != "" && u.Path != "/") || u.RawQuery != "" || u.Fragment != "" {
-		return nil, errors.New("292 harvest proxy must be an HTTP(S) or SOCKS5(h) URL")
-	}
 	if cfg.TTLSeconds < 600 || cfg.TTLSeconds > 86400 || cfg.RefreshBeforeSeconds < 30 || cfg.RefreshBeforeSeconds >= cfg.TTLSeconds || len(cfg.Models) == 0 {
 		return nil, errors.New("invalid 292 TTL, refresh window or models")
 	}
 	t.cfg.Models = normalizeStringList(cfg.Models)
-	transport, _, err := proxyutil.BuildHTTPTransport(cfg.ProxyURL)
-	if err != nil {
-		return nil, errors.New("invalid 292 harvest proxy")
+	if !cfg.ImportOnly {
+		u, err := url.Parse(strings.TrimSpace(cfg.ProxyURL))
+		if err != nil || u.Hostname() == "" || (u.Scheme != "http" && u.Scheme != "https" && u.Scheme != "socks5" && u.Scheme != "socks5h") || (u.Path != "" && u.Path != "/") || u.RawQuery != "" || u.Fragment != "" {
+			return nil, errors.New("292 harvest proxy must be an HTTP(S) or SOCKS5(h) URL")
+		}
+		transport, err := newCodexTicketTransport(u)
+		if err != nil {
+			return nil, errors.New("invalid 292 harvest proxy")
+		}
+		t.client = &http.Client{Transport: transport, Timeout: 25 * time.Second, CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }}
 	}
-	transport.DisableKeepAlives = true
-	t.client = &http.Client{Transport: transport, Timeout: 25 * time.Second, CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }}
 	if b, err := os.ReadFile(path); err == nil {
 		if json.Unmarshal(b, &t.records) != nil {
-			t.persistenceError = "无法读取票据缓存，将重新取票"
+			t.persistenceError = "无法读取票据缓存，请重新导入或取票"
 			t.records = map[string]codexTicketRecord{}
 		}
 	} else if !os.IsNotExist(err) {
-		t.persistenceError = "无法读取票据缓存，将重新取票"
+		t.persistenceError = "无法读取票据缓存，请重新导入或取票"
 	}
 	if t.records == nil {
 		t.records = map[string]codexTicketRecord{}
@@ -108,6 +116,36 @@ func newCodexTicketManager(cfg codexTicketConfig, m *manifest, path string) (*co
 		}
 	}
 	return t, nil
+}
+
+// Harvest follows Sub2API's HTTP/1.1 policy. A fresh transport avoids inheriting
+// HTTP/2 ALPN settings from http.DefaultTransport.Clone().
+func newCodexTicketTransport(proxyURL *url.URL) (*http.Transport, error) {
+	dialer := &net.Dialer{Timeout: 10 * time.Second, KeepAlive: 30 * time.Second}
+	transport := &http.Transport{
+		DialContext:         dialer.DialContext,
+		TLSHandshakeTimeout: 10 * time.Second,
+		DisableKeepAlives:   true,
+		ForceAttemptHTTP2:   false,
+		TLSNextProto:        make(map[string]func(string, *tls.Conn) http.RoundTripper),
+	}
+	if proxyURL == nil {
+		return transport, nil
+	}
+	if proxyURL.Scheme == "socks5" || proxyURL.Scheme == "socks5h" {
+		proxyDialer, err := proxy.FromURL(proxyURL, dialer)
+		if err != nil {
+			return nil, err
+		}
+		contextDialer, ok := proxyDialer.(proxy.ContextDialer)
+		if !ok {
+			return nil, errors.New("harvest proxy does not support cancellation")
+		}
+		transport.DialContext = contextDialer.DialContext
+	} else {
+		transport.Proxy = http.ProxyURL(proxyURL)
+	}
+	return transport, nil
 }
 
 func ticketKey(accountID, model string) string { return accountID + "\x00" + model }
@@ -180,6 +218,7 @@ func (t *codexTicketManager) snapshot(allowed map[string]bool) []codexTicketStat
 			s.AccountID, s.Model = a.ID, model
 			r := t.records[key]
 			s.Ready, s.CapturedAt, s.ExpiresAt = r.valid(time.Now()), r.CapturedAt, r.ExpiresAt
+			s.Source = r.Source
 			result = append(result, s)
 		}
 	}
@@ -187,7 +226,7 @@ func (t *codexTicketManager) snapshot(allowed map[string]bool) []codexTicketStat
 }
 
 func (t *codexTicketManager) start(ctx context.Context) {
-	if !t.cfg.Enabled {
+	if !t.cfg.Enabled || t.cfg.ImportOnly {
 		return
 	}
 	go func() {
@@ -209,6 +248,9 @@ func (t *codexTicketManager) start(ctx context.Context) {
 }
 
 func (t *codexTicketManager) refresh(ctx context.Context, force map[string]bool) {
+	if !t.cfg.Enabled || t.cfg.ImportOnly {
+		return
+	}
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, 4)
 	for _, a := range t.manifest.Accounts {
@@ -262,8 +304,8 @@ func (t *codexTicketManager) probe(ctx context.Context, a accountSpec, model str
 	s.LastHTTPStatus = code
 	s.LastLength = len(state)
 	s.LastError = ""
-	if probeErr == nil && code == 200 && len(state) == 292 && strings.HasPrefix(state, "gAAAAA") {
-		t.records[key] = codexTicketRecord{State: state, CapturedAt: now.UnixMilli(), ExpiresAt: now.Add(time.Duration(t.cfg.TTLSeconds) * time.Second).UnixMilli()}
+	if probeErr == nil && code == 200 && validCodexTicketState(state) {
+		t.records[key] = codexTicketRecord{State: state, Source: "harvested", CapturedAt: now.UnixMilli(), ExpiresAt: now.Add(time.Duration(t.cfg.TTLSeconds) * time.Second).UnixMilli()}
 		s.failures = 0
 		s.nextAttemptAt = 0
 		if err := t.persistLocked(); err != nil {
@@ -305,8 +347,8 @@ func (t *codexTicketManager) requestTicket(ctx context.Context, a accountSpec, m
 	req.Header.Set("Accept", "text/event-stream")
 	req.Header.Set("OpenAI-Beta", "responses=experimental")
 	req.Header.Set("Session_id", uuid.NewString())
-	req.Header.Set("User-Agent", "codex-tui/0.153.4 (Mac OS 26.5.0; arm64) iTerm.app/3.6.10 (codex-tui; 0.153.4)")
-	req.Header.Set("Version", "0.153.4")
+	req.Header.Set("User-Agent", "codex-tui/"+codexTicketClientVersion+" (Ubuntu 22.4.0; x86_64) xterm-256color")
+	req.Header.Set("Version", codexTicketClientVersion)
 	req.Header.Set("Originator", "codex-tui")
 	resp, err := t.client.Do(req)
 	if err != nil {
@@ -363,7 +405,7 @@ func (s *relayServer) handleCodexTickets(c *gin.Context) {
 	for _, id := range spec.AccountIDs {
 		allowed[id] = true
 	}
-	if c.Request.Method == http.MethodPost && t.cfg.Enabled {
+	if c.Request.Method == http.MethodPost && t.cfg.Enabled && !t.cfg.ImportOnly {
 		select {
 		case t.wake <- allowed:
 		default:
@@ -372,7 +414,7 @@ func (s *relayServer) handleCodexTickets(c *gin.Context) {
 	t.mu.Lock()
 	warning := t.persistenceError
 	t.mu.Unlock()
-	c.JSON(200, gin.H{"enabled": t.cfg.Enabled, "tickets": t.snapshot(allowed), "warning": warning})
+	c.JSON(200, gin.H{"enabled": t.cfg.Enabled, "importOnly": t.cfg.ImportOnly, "tickets": t.snapshot(allowed), "warning": warning})
 }
 
 type codexTicketSelector struct {

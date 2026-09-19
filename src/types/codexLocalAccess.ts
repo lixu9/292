@@ -529,6 +529,7 @@ export interface CodexInstanceGatewayView {
 
 export interface CodexTicketConfig {
   enabled: boolean;
+  importOnly?: boolean;
   proxyUrl: string;
   models: string[];
   ttlSeconds: number;
@@ -540,6 +541,7 @@ export interface CodexTicketStatus {
   accountId: string;
   model: string;
   ready: boolean;
+  source?: "harvested" | "imported" | "";
   refreshing: boolean;
   capturedAt: number;
   expiresAt: number;
@@ -552,7 +554,15 @@ export interface CodexTicketStatus {
 
 export interface CodexTicketSnapshot {
   enabled: boolean;
+  importOnly?: boolean;
   running: boolean;
   tickets: CodexTicketStatus[];
   warning?: string;
+}
+
+export interface CodexTicketImportResult {
+  imported: number;
+  unchanged: number;
+  skipped: number;
+  reasons: Record<string, number>;
 }

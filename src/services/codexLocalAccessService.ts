@@ -400,3 +400,11 @@ export async function updateTickets(config: import('../types/codexLocalAccess').
 export async function getTicketStatus(refresh = false): Promise<import('../types/codexLocalAccess').CodexTicketSnapshot> {
   return invoke('codex_local_access_ticket_status', { refresh });
 }
+
+export async function importTickets(importPath: string): Promise<import('../types/codexLocalAccess').CodexTicketImportResult> {
+  return invoke('codex_local_access_import_tickets', { importPath });
+}
+
+export async function exportTickets(exportPath: string): Promise<{ exported: number }> {
+  return invoke('codex_local_access_export_tickets', { exportPath });
+}

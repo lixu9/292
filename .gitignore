@@ -50,3 +50,8 @@ target/
 docs/plugin-architecture-proposal.md
 .aitasks
 .qoder/
+
+# Local 292 release link and probe reports
+/release
+/diagnostics/292-comparison-summary.md
+/diagnostics/292-node-comparison.jsonl

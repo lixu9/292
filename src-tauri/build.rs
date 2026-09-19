@@ -179,7 +179,7 @@ fn main() {
     build_cockpit_cliproxy_sidecar();
 
     #[cfg(target_os = "macos")]
-    {
+    if target.contains("apple-darwin") {
         SwiftLinker::new("12.0")
             .with_package("MacosNativeMenuSwift", "native/macos-native-menu")
             .link();

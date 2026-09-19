@@ -2369,6 +2369,7 @@ fn prepare_sidecar_launch_config_in_dir_sync(
         "maxAccountConcurrency": collection.max_account_concurrency,
         "accountConcurrencyWaitMs": collection.account_concurrency_wait_ms,
         "codexTicket": collection.codex_ticket,
+        "ticketControlKey": if api_service { internal_api_service_key() } else { "" },
     });
 
     let mut config = Map::new();
